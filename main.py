@@ -1,0 +1,62 @@
+from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
+import httpx
+import json
+import os
+from bs4 import BeautifulSoup
+load_dotenv()
+
+mcp = FastMCP("docs")
+
+USER_AGENT = "docs-app/1.0"
+WAYBACK_URL="http://web.archive.org/web/"
+
+
+async def search_wayback(query: str) -> dict | None:
+    payload = json.dumps({"q": query, "num": 2})
+
+        try:
+            response = await client.get(
+                WAYBACK_URL, timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.TimeoutException:
+            return {"organic": []}
+  
+async def fetch_url(url: str):
+  async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, timeout=30.0)
+            soup = BeautifulSoup(response.text, "html.parser")
+            text = soup.get_text()
+            return text
+        except httpx.TimeoutException:
+            return "Timeout error"
+
+@mcp.tool()  
+async def get_docs(query: str, date: str):
+  """
+  Search the Internet Archive (Wayback Machine) for a given url on given date range.
+
+  Args:
+    query: The domain to search for (e.g. "https://www.google.com")
+    date: The date to search in. Can be year or exact date
+  Returns:
+    Text from the result
+  """
+  #get timestamp from date here
+
+  query = f"site:{WAYBACK_URL{query}{date}"
+  results = await search_wayback(query)
+  if len(results["organic"]) == 0:
+    return "No results found"
+  
+  text = ""
+  for result in results["organic"]:
+    text += await fetch_url(result["link"])
+  return text
+
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
